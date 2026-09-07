@@ -47,30 +47,31 @@
 
 ## 构建
 
-环境要求：JDK 17+（本项目用 JDK 21）、Android SDK（platform 36 / build-tools 36.0.0）。
+环境要求：JDK 17+（推荐 JDK 21）、Android SDK（platform 36 / build-tools 36.0.0）。
 
 ```bash
+# Linux / macOS
+export JAVA_HOME=/path/to/jdk-21
+./gradlew assembleDebug
+
 # Windows
-set JAVA_HOME=C:\Program Files\Android\openjdk\jdk-21.0.8
+set JAVA_HOME=C:\Path\To\jdk-21
 gradlew.bat assembleDebug
 ```
 
-或直接在 Android Studio 中打开本目录。产物：`app/build/outputs/apk/debug/app-debug.apk`。
+或直接用 Android Studio 打开本目录（Gradle JDK 设为 17+）。产物：`app/build/outputs/apk/debug/app-debug.apk`。
 
-`local.properties` 中已配置（按你的环境）：
+首次构建前需在项目根目录创建 `local.properties`，指向你的 Android SDK：
 
+```properties
+sdk.dir=/path/to/Android/sdk
 ```
-sdk.dir=C\:/Program Files (x86)/Android/android-sdk
-ndk.dir=C:/Users/AIKA/AppData/Local/Android/Sdk/ndk/28.2.13676358
-```
-
-> SDK 说明：本机有两套 Android SDK，构建使用 `Program Files (x86)` 下那套（自带 `platforms/android-36` + `build-tools/36.0.0`，够用且无需额外下载）。该目录无写权限，需要装新 SDK 组件时，用它的 `cmdline-tools` 指向**用户目录**那套 SDK 来装。NDK 只在用户目录那套里有。
 
 依赖版本（见 `gradle/libs.versions.toml`）：AGP 8.13.2 / Gradle 8.13 / `io.github.libxposed:api:101.0.1` + `io.github.libxposed:service:101.0.0`。
 
-> 注意：`api` 102 与 `service` 102 要求 `compileSdk 37`，本机仓库暂未提供 platform 37，因此使用 101 系列（对应 LSPosed 2.0.1 官方支持的 API 等级）。
+> 注意：`api` / `service` 的 102 系列要求 `compileSdk 37`，需 Android SDK platform 37；本项目锁定 **101 系列**，对应 LSPosed 2.0.1 官方支持的 API 等级。
 
-> 本项目是纯 Java 模块，没有 native 代码，因此 NDK 实际不参与编译，仅在 `app/build.gradle.kts` 中登记 `ndkVersion = "28.2.13676358"` 备用。
+> 本项目是纯 Java 模块，没有 native 代码，NDK 不参与编译。
 
 ## 安装与启用
 
