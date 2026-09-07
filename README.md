@@ -96,3 +96,7 @@ sdk.dir=/path/to/Android/sdk
 - `code receiver registered in <包名>`
 - `code detected: 884219 from 1069xxxx`
 - `SMS blocked (verification code intercepted)`
+
+## 许可证
+
+[MIT](LICENSE) © 2026 AIKA1024
