@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">验证码自动填充</string>
+    <string name="app_desc">收到短信时自动复制并填入验证码（支持自定义正则 / 拦截）</string>
+</resources>

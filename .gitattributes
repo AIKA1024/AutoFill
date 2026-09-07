@@ -1,0 +1,7 @@
+# gradlew 是 shell 脚本，必须保持 LF，否则 Unix 上执行会报 bad interpreter
+gradlew        text eol=lf
+*.sh           text eol=lf
+
+# Windows 批处理保持 CRLF
+*.bat          text eol=crlf
+*.cmd          text eol=crlf
