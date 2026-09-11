@@ -163,8 +163,8 @@ public final class AppHooks {
                 && CodeParser.matchKeyword(hint.toString(), HookConfig.keywords());
         boolean numeric = (editText.getInputType() & InputType.TYPE_MASK_CLASS)
                 == InputType.TYPE_CLASS_NUMBER;
-        // hint 命中关键词、或纯数字输入框、或刚收到短信（30s 内）才填入
-        if (hintMatch || numeric || age <= FRESH_TTL) {
+        // hint 命中关键词、输入框特征像验证码框、或刚收到短信（30s 内）才填入
+        if (hintMatch || numeric || Actions.isLikelyCodeField(editText) || age <= FRESH_TTL) {
             Actions.setText(editText, code);
             sPendingCode = null;
             module.log(Log.INFO, TAG, "filled on focus in " + sPackageName);
@@ -220,7 +220,12 @@ public final class AppHooks {
             sPendingCode = code;
             sPendingMillis = System.currentTimeMillis();
 
-            if (!isForeground()) {
+            boolean foreground = isForeground();
+            module.log(Log.INFO, TAG, "code received in " + sPackageName
+                    + " | foreground=" + foreground
+                    + " | autoFill=" + HookConfig.autoFill());
+
+            if (!foreground) {
                 // 不在前台就不抢着处理，交给真正的前台 App
                 return;
             }

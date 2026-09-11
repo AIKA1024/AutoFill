@@ -85,7 +85,7 @@ sdk.dir=/path/to/Android/sdk
 
 - 短信拦截点在 `InboundSmsHandler#dispatchIntent`，极少数深度定制 ROM 若改名该方法，拦截与自动识别会失效（可查看 LSPosed 日志 `AutoFillSms`，会打印 hook 到的重载数量）。
 - Android 13+ 通知由前台 App 自身发出，若该 App 未授予通知权限会自动改由电话进程代发（通知来源会显示为「电话」相关应用）。
-- 自动填入是启发式的：优先填当前有焦点的输入框；无焦点时，仅当界面上只有一个可见输入框才填入。对 Flutter / 自绘输入控件可能无效。
+- 自动填入是启发式的：优先填当前有焦点的输入框；无焦点时，按 hint / 资源 id / contentDescription / `maxLength` / 数字键盘等特征给输入框打分，取分最高的那个。**若所有输入框都不像验证码框，则不会填入**（避免填错位置）。对 Jetpack Compose / Flutter / 自绘输入控件无效。
 
 ## 日志排查
 
@@ -93,9 +93,25 @@ sdk.dir=/path/to/Android/sdk
 
 - `onModuleLoaded | process=... | framework=... | api=...`
 - `InboundSmsHandler hooked: N overload(s) in com.android.phone`
-- `code receiver registered in <包名>`
-- `code detected: 884219 from 1069xxxx`
+- `code receiver registered in <包名>` —— 每个 App 进程启动时会打一条，**没有它说明该进程没被注入**
+- `code received in <包名> | foreground=true | autoFill=true` —— **foreground 为 false 说明前台判定失败，填入不会执行**
+- `candidate inputs: N` —— 界面上找到的可见输入框数量
+- `filled via focused EditText` / `scored EditText` / `webview` / `split boxes` —— 填入成功及所用路径
+- `no input found — 可能是 Compose / Flutter / 自绘控件，无法填入`
 - `SMS blocked (verification code intercepted)`
+
+## 自动填入为什么会失败
+
+填入完全依赖"在当前界面上找到对的那个输入框"，下面几种情况都找不到：
+
+| 情况 | 表现 | 能否解决 |
+| --- | --- | --- |
+| 界面用 Jetpack Compose / Flutter / 自绘控件 | 日志显示 `no input found`，界面上根本没有 `EditText` | 不能（本模块只认原生 View） |
+| H5 登录页（WebView） | 有 `EditText` 但不在原生层 | 已支持：注入 JS 填写（会临时开启 JS，1.5s 后还原） |
+| 多格 OTP（6 个单字符框） | 每格只收 1 个字符 | 已支持：逐格填入 |
+| 多个输入框、且特征都不像验证码框 | `candidate inputs: N` 但没填 | 打开"关键词"设置，把该页面的输入框提示词加进去 |
+| 目标 App 未勾选作用域 | 日志里没有 `code receiver registered in <该 App>` | LSPosed 作用域必须勾 **系统框架（android）** |
+| 键盘/悬浮窗抢占焦点 | 填入不完整 | 关闭剪贴板监听类 App，或关掉"自动复制" |
 
 ## 许可证
 
