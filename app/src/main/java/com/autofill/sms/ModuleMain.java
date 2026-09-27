@@ -23,6 +23,13 @@ public class ModuleMain extends XposedModule {
     /** 当前进程的模块实例，用于把日志同时写进 LSPosed 自己的日志系统。 */
     private static volatile XposedModule sModule;
 
+    /** 当前进程名（onModuleLoaded 里拿到，供 hook 类判断自己跑在哪个进程）。 */
+    private static volatile String sProcessName;
+
+    public static String getProcessName() {
+        return sProcessName;
+    }
+
     public ModuleMain() {
         super();
     }
@@ -65,6 +72,7 @@ public class ModuleMain extends XposedModule {
     @Override
     public void onModuleLoaded(ModuleLoadedParam param) {
         sModule = this;
+        sProcessName = param.getProcessName();
         HookConfig.init(this);
         ModuleMain.log(Log.INFO, "onModuleLoaded | process=" + param.getProcessName()
                 + " | framework=" + getFrameworkName()

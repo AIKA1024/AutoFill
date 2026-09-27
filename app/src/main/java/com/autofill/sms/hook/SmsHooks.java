@@ -31,6 +31,22 @@ public final class SmsHooks {
     private SmsHooks() {
     }
 
+    /**
+     * 短信分发只发生在电话进程。用进程名白名单而非「类是否可加载」来判断。
+     * <p>
+     * 若某 ROM 把短信处理放在别的进程，这里需要扩充（日志会提示
+     * 没有任何进程 hook 到 InboundSmsHandler）。
+     */
+    private static boolean isSmsProcess(String proc) {
+        if (proc == null) {
+            return false;
+        }
+        return proc.equals("com.android.phone")
+                || proc.startsWith("com.android.phone:")
+                || proc.startsWith("com.android.mms")
+                || proc.contains("telephony");
+    }
+
     public static boolean isInstalled() {
         return sInstalled;
     }
@@ -39,11 +55,18 @@ public final class SmsHooks {
         if (sInstalled) {
             return;
         }
+        // 必须先按进程名筛选。真机实测：system 进程里也能通过 param.getClassLoader()
+        // 加载到 InboundSmsHandler（例如包名 com.android.providers.settings 时），
+        // 只用「类是否存在」判断会把短信 hook 误装到 system_server，造成重复解析与日志误导。
+        String proc = ModuleMain.getProcessName();
+        if (!isSmsProcess(proc)) {
+            return;
+        }
         Class<?> inbound;
         try {
             inbound = Class.forName(CLASS_INBOUND, false, param.getClassLoader());
         } catch (Throwable t) {
-            // 不是电话进程，正常现象
+            ModuleMain.log(Log.WARN, "InboundSmsHandler not found in " + proc);
             return;
         }
         sInstalled = true;
