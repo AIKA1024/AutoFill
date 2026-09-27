@@ -90,6 +90,10 @@ public class ModuleMain extends XposedModule {
     @Override
     public void onPackageReady(PackageReadyParam param) {
         String pkg = param.getPackageName();
+        // 无条件打印：这是判断「某个 App 有没有被注入」的唯一依据。
+        // 日志里若看不到目标 App 的包名，就说明它不在 LSPosed 作用域里，
+        // 后面的复制/填入一律不会发生（只有 com.android.phone 的兜底会生效）。
+        ModuleMain.log(Log.INFO, "package ready: " + pkg + " | process=" + sProcessName);
         if (pkg == null || "com.autofill.sms".equals(pkg)) {
             return;
         }

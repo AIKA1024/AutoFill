@@ -82,9 +82,15 @@ sdk.dir=/path/to/Android/sdk
 
 1. 安装 APK；
 2. LSPosed 管理器 → 模块 → 勾选「验证码自动填充」；
-3. 作用域：勾选 **系统框架（android）** 与 **Phone / 电话（com.android.phone）**。前者负责把模块注入到所有 App 进程（自动填入），后者负责短信解析与拦截；
-4. 重启（或软重启）；
+3. 作用域：勾选 **要使用自动填入的 App 本身** + **电话服务（com.android.phone）**。
+   - `com.android.phone` 负责短信解析、复制与拦截；
+   - **填入必须在目标 App 自己的进程里执行**，所以该 App 必须单独勾选。每换一个 App 就要勾一次，勾完重启一次即长期有效。
+   - 作用域列表里那个「Android 系统 / 系统框架」对应的包名就是 `android`，注入后日志显示为 `process=system`（即 system_server）。**LSPosed 2.x 的现代模块不会因为它而自动覆盖所有 App 进程**——真机验证：勾了 `android` 后只看到 `process=system` 和 `process=com.android.phone` 两个进程，第三方 App 一个都没被注入。
+   - 若确实想对所有 App 生效，可在 LSPosed 设置里开启「全局作用域」（如有该选项），或逐个勾选；
+4. 重启手机（软重启不够）；
 5. 打开一次本应用，确认顶部显示「框架已连接」，按需调整设置。
+
+> 只勾 `com.android.phone` 时：**复制能用，填入不能用**——因为复制在电话进程完成，而填入需要目标 App 进程里有模块。
 
 ## 已知限制
 
@@ -104,12 +110,13 @@ Windows PowerShell 里没有 `grep`，不要写 `adb logcat | grep AutoFillSms`�
 也可以看 LSPosed 管理器 → 日志页。
 
 > **一条日志都没有 = 模块没被注入任何进程。** 按序检查：LSPosed 里模块开关是否打开 →
-> 作用域是否勾了 **系统框架（android）** 和 **Phone（com.android.phone）** → 是否**重启过手机**
-> （软重启不够）。确认后随便打开一个 App，应该立刻看到 `code receiver registered in <包名>`。
+> 作用域是否勾了 **目标 App** 和 **Phone（com.android.phone）** → 是否**重启过手机**
+> （软重启不够）。确认后打开目标 App，应该立刻看到 `package ready: <该 App 包名>`。
 
 - `onModuleLoaded | process=... | framework=... | api=...`
 - `InboundSmsHandler hooked: N overload(s) in com.android.phone`
-- `code receiver registered in <包名>` —— 每个 App 进程启动时会打一条，**没有它说明该进程没被注入**
+- `package ready: <包名> | process=...` —— **判断某 App 有没有被注入的唯一依据**；看不到目标 App 的包名就说明它不在作用域里
+- `code receiver registered in <包名>` —— 该 App 进程已挂上接收器，之后才可能填入
 - `code received in <包名> | foreground=true | autoFill=true` —— **foreground 为 false 说明前台判定失败，填入不会执行**
 - `candidate inputs: N` —— 界面上找到的可见输入框数量
 - `filled via focused EditText` / `scored EditText` / `webview` / `split boxes` —— 填入成功及所用路径
@@ -126,8 +133,8 @@ Windows PowerShell 里没有 `grep`，不要写 `adb logcat | grep AutoFillSms`�
 | H5 登录页（WebView） | 有 `EditText` 但不在原生层 | 已支持：注入 JS 填写（会临时开启 JS，1.5s 后还原） |
 | 多格 OTP（6 个单字符框） | 每格只收 1 个字符 | 已支持：逐格填入 |
 | 多个输入框、且特征都不像验证码框 | `candidate inputs: N` 但没填 | 打开"关键词"设置，把该页面的输入框提示词加进去 |
-| 目标 App 未勾选作用域 | 日志里没有 `code receiver registered in <该 App>` | LSPosed 作用域必须勾 **系统框架（android）** |
-| **全部日志都是同一个进程打的**（只有 `code detected` + 反复 `fill skipped: no resumed activity`，PID 相同） | 没有任何 App 进程被注入，广播无人接管，短信进程只能自己兜底——而它没有界面 | 作用域勾 **系统框架（android）**；只勾 `com.android.phone` 只能复制，填不了 |
+| **目标 App 没勾进作用域**（最常见） | 日志里没有 `package ready: <该 App>`，也没有对应进程的 `onModuleLoaded` | 在 LSPosed 作用域里**勾选该 App 本身**，重启 |
+| **全部日志都是同一个进程打的**（只有 `code detected` + 反复 `fill skipped: no resumed activity`，PID 相同） | 没有任何 App 进程被注入，广播无人接管，短信进程只能自己兜底——而它没有界面 | 把**目标 App** 加进作用域；只勾 `com.android.phone` 能复制但填不了（勾 `android` 也不够） |
 | 键盘/悬浮窗抢占焦点 | 填入不完整 | 关闭剪贴板监听类 App，或关掉"自动复制" |
 
 ## 许可证
