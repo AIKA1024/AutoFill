@@ -25,6 +25,12 @@
 
 设置页底部带「规则测试」：粘贴一条短信正文即可验证关键词 + 正则能否提取出验证码。
 
+**验证码提取优先级**（避免取到短信签名里的数字，如 `【4399】验证码：798759` 只应取 `798759`）：
+
+1. 关键词（"验证码 / 校验码 / code / OTP" 等）**之后**的第一个匹配 —— 验证码基本都紧跟提示词；
+2. 屏蔽短信签名（`【】`、`[]`、《》、『』、`<>` 内的内容，长 0~20）后的第一个匹配；
+3. 兜底：整条短信的第一个匹配。
+
 ## 实现原理
 
 1. **短信解析（com.android.phone 进程）**
@@ -218,7 +224,7 @@ Windows PowerShell 里没有 `grep`，不要写 `adb logcat | grep AutoFillSms`�
 | **全部日志都是同一个进程打的**（只有 `code detected` + 反复 `fill skipped: no resumed activity`，PID 相同） | 没有任何 App 进程被注入，广播无人接管，短信进程只能自己兜底——而它没有界面 | 把**目标 App** 加进作用域；只勾 `com.android.phone` 能复制但填不了（勾 `android` 也不够） |
 | **作用域里没有本模块（com.autofill.sms）** | 正常，也不需要 | 模块自身不会被 LSPosed 列进作用域；root 注入用的是普通 Android 组件（显式 bind / 广播），与 Xposed 注入无关 |
 | **装完没打开过本应用** | 收不到任何广播（含开机广播），root 注入静默失效 | 打开一次本应用：**一次性，之后永久有效**；想跳过只能靠下面那条 bind 通道 |
-| **装了 Thanox / 类似后台管理工具** | 日志出现 `Thanox-Core: bindServiceLocked block` | 绑定通道被拦；把本应用加入其白名单，或至少打开一次本应用让广播通道可用 |
+| **装了 Thanox / 类似后台管理工具** | 日志出现 `Thanox-Core: bindServiceLocked block` | 绑定通道被拦。放行方式：Thanox → 后台启动 → 规则 → `ALLOW com.android.phone com.autofill.sms`。**真机验证**：放行后即使把本应用 `force-stop`（stopped 状态、进程已死），bind 也能把它拉起来完成注入，"打开一次本应用"不再是硬要求 |
 
 ## 许可证
 
