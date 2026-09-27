@@ -79,7 +79,11 @@ public final class SmsBridge {
 
             Handler main = new Handler(Looper.getMainLooper());
             if (!handled) {
-                // 没有任何前台应用处理（例如在桌面/息屏时收到短信），由本进程兜底
+                // 没有任何应用进程接走验证码。正常情况（桌面/息屏）会走到这里；
+                // 若此刻明明有 App 在前台，说明该 App 进程没被注入 —— 几乎都是作用域没勾「系统框架」。
+                ModuleMain.log(Log.WARN, "no app process handled the code, fallback in "
+                        + ctx.getPackageName()
+                        + " — 若此刻前台有 App，检查 LSPosed 作用域是否勾选「系统框架 android」");
                 main.post(() -> Actions.onCode(module, ctx, ctx.getPackageName(), code, sender, body));
             } else if (needNotify) {
                 // 前台应用没有通知权限，这里代发通知

@@ -173,7 +173,10 @@ public final class Actions {
         try {
             Activity activity = AppHooks.getResumedActivity();
             if (activity == null) {
-                ModuleMain.log(Log.WARN, "fill skipped: no resumed activity");
+                // 在 com.android.phone 里必然走不到这里（短信进程没有界面），
+                // 出现即意味着兜底被触发：没有任何 App 进程接走验证码。
+                ModuleMain.log(Log.WARN, "fill skipped: no resumed activity (process="
+                        + AppHooks.getPackageNameSafe() + ")");
                 return;
             }
             View decor = activity.getWindow() == null

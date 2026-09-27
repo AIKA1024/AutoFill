@@ -127,6 +127,7 @@ Windows PowerShell 里没有 `grep`，不要写 `adb logcat | grep AutoFillSms`�
 | 多格 OTP（6 个单字符框） | 每格只收 1 个字符 | 已支持：逐格填入 |
 | 多个输入框、且特征都不像验证码框 | `candidate inputs: N` 但没填 | 打开"关键词"设置，把该页面的输入框提示词加进去 |
 | 目标 App 未勾选作用域 | 日志里没有 `code receiver registered in <该 App>` | LSPosed 作用域必须勾 **系统框架（android）** |
+| **全部日志都是同一个进程打的**（只有 `code detected` + 反复 `fill skipped: no resumed activity`，PID 相同） | 没有任何 App 进程被注入，广播无人接管，短信进程只能自己兜底——而它没有界面 | 作用域勾 **系统框架（android）**；只勾 `com.android.phone` 只能复制，填不了 |
 | 键盘/悬浮窗抢占焦点 | 填入不完整 | 关闭剪贴板监听类 App，或关掉"自动复制" |
 
 ## 许可证

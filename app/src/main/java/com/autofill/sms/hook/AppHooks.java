@@ -64,6 +64,11 @@ public final class AppHooks {
         hookTextFocus(module);
     }
 
+    /** 当前进程包名（用于日志判断兜底发生在哪个进程） */
+    public static String getPackageNameSafe() {
+        return sPackageName == null ? "?" : sPackageName;
+    }
+
     public static Context getAppContext() {
         return sAppContext;
     }
@@ -105,7 +110,13 @@ public final class AppHooks {
             module.hook(onResume).intercept(chain -> {
                 Object result = chain.proceed();
                 try {
-                    sResumed = new WeakReference<>((Activity) chain.getThisObject());
+                    Activity a = (Activity) chain.getThisObject();
+                    sResumed = new WeakReference<>(a);
+                    // 兜底：Application#onCreate 若早于 Hook 安装（或该 App 自定义了 Application 分支），
+                    // 接收器就会漏注册，导致永远收不到验证码广播。这里在首个界面出现时补一次。
+                    if (!sReceiverRegistered) {
+                        registerReceiver(module, a.getApplicationContext());
+                    }
                 } catch (Throwable ignored) {
                 }
                 return result;
