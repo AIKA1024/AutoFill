@@ -69,7 +69,12 @@ sdk.dir=/path/to/Android/sdk
 
 依赖版本（见 `gradle/libs.versions.toml`）：AGP 8.13.2 / Gradle 8.13 / `io.github.libxposed:api:101.0.1` + `io.github.libxposed:service:101.0.0`。
 
-> 注意：`api` / `service` 的 102 系列要求 `compileSdk 37`，需 Android SDK platform 37；本项目锁定 **101 系列**，对应 LSPosed 2.0.1 官方支持的 API 等级。
+> **为什么不直接用 API 102？** 生态确实在往 102 迁移，但 `minApiVersion` 的语义是「模块能接受的最低框架 API」：
+> 框架 API ≥ `minApiVersion` 就能加载。写 **101** 意味着模块在 **API 101 和 API 102 的框架上都能跑**；
+> 写 102 则只能在 102 框架上跑。LSPosed 官方对 102 的限制（禁止调用 Legacy API）只针对
+> `targetApiVersion ≥ 102` 的模块，**101 模块不受影响**。因此 101 的兼容面更大。
+> 若你的框架只支持 102 且模块不加载，把 `module.prop` 的 `targetApiVersion` 改成 102，
+> 并改用 `io.github.libxposed:api:102.0.0` + `service:102.0.0` 编译（需要 Android SDK platform 37）。
 
 > 本项目是纯 Java 模块，没有 native 代码，NDK 不参与编译。
 
