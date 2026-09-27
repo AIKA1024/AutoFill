@@ -3,6 +3,7 @@ package com.autofill.sms;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.io.BufferedReader;
@@ -37,6 +38,11 @@ public class RootFillReceiver extends BroadcastReceiver {
 
     private static final String[] SU_CANDIDATES = {"su", "/system/bin/su", "/system/xbin/su"};
 
+    /** 同一个验证码在这个时间窗内只注入一次，防止「服务绑定 + 广播」两条通道重复填 */
+    private static final long DUPLICATE_WINDOW_MS = 5000L;
+    private static volatile String sLastCode;
+    private static volatile long sLastAtMs;
+
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent == null || !ACTION.equals(intent.getAction())) {
@@ -52,22 +58,37 @@ public class RootFillReceiver extends BroadcastReceiver {
         final String finalCode = code;
         new Thread(() -> {
             try {
-                boolean ok = inject(finalCode);
-                Log.i(TAG, "root fill " + (ok ? "sent: " : "FAILED: ") + finalCode);
+                inject(finalCode);
             } finally {
                 pending.finish();
             }
         }, "root-fill").start();
     }
 
+    /**
+     * 注入验证码（结果自己打日志，调用方不要再打，否则去重时会出现两条 sent）。
+     */
+    static void inject(String code) {
+        if (code == null || !SAFE_CODE.matcher(code).matches()) {
+            Log.w(TAG, "root fill refused, code not in safe charset: " + code);
+            return;
+        }
+        if (isDuplicate(code)) {
+            Log.i(TAG, "root fill skipped (same code just injected): " + code);
+            return;
+        }
+        boolean ok = runSu(code);
+        Log.i(TAG, "root fill " + (ok ? "sent: " : "FAILED: ") + code);
+    }
+
     /** @return 注入命令是否执行成功（不代表真的落到了输入框上） */
-    static boolean inject(String code) {
+    private static boolean runSu(String code) {
         String cmd = "input text " + code;
         for (String su : SU_CANDIDATES) {
             try {
                 Process p = Runtime.getRuntime().exec(new String[]{su, "-c", cmd});
                 String err = readAll(p);
-                boolean finished = p.waitFor(8, TimeUnit.SECONDS);
+                boolean finished = p.waitFor(5, TimeUnit.SECONDS);
                 if (!finished) {
                     p.destroy();
                     Log.w(TAG, "root fill timeout via " + su);
@@ -83,6 +104,15 @@ public class RootFillReceiver extends BroadcastReceiver {
             }
         }
         return false;
+    }
+
+    /** 同一个验证码刚注入过（5 秒内）就跳过——两条触发通道可能同时到达 */
+    private static boolean isDuplicate(String code) {
+        long now = SystemClock.elapsedRealtime();
+        boolean dup = code.equals(sLastCode) && (now - sLastAtMs) < DUPLICATE_WINDOW_MS;
+        sLastCode = code;
+        sLastAtMs = now;
+        return dup;
     }
 
     /** 读一点错误输出，便于判断是权限被拒还是命令不存在 */

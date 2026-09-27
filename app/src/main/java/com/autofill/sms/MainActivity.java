@@ -119,7 +119,8 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
                 boolean ok = finished && p.exitValue() == 0 && "0".equals(sb.toString().trim());
                 result = ok
                         ? "root 注入可用：无需把目标 App 勾进作用域，验证码会以按键方式填入当前焦点输入框"
-                                + "（需先点进输入框，对自绘控件同样有效）。"
+                                + "（需先点进输入框，对自绘控件同样有效）。装完请打开过本应用一次，"
+                                + "否则收不到触发广播。"
                         : "拿不到 root：请在 KernelSU 管理器里给本应用授予 root 权限；"
                                 + "未授权时只能靠「把目标 App 勾进作用域 + setText」填入。";
             } catch (Throwable t) {

@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".App"
@@ -34,6 +35,27 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.autofill.sms.ROOT_FILL" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+            短信进程通过显式绑定拉起本进程并执行 root 注入。
+            exported=true：调用方是 com.android.phone（另一个 uid）。
+            绑定是"显式启动组件"，不受 stopped state 限制，所以本应用即使一次都没
+            打开过也能被拉起来注入；广播那条路（上面的 receiver）作为兜底保留。
+        -->
+        <service
+            android:name=".RootFillService"
+            android:exported="true" />
+
+        <!-- 开机 / 更新后接收一次系统广播，解除 stopped 状态，让 root 注入的广播通道保持可用 -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
     </application>

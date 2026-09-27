@@ -1,10 +1,13 @@
 package com.autofill.sms.hook;
 
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
@@ -21,6 +24,9 @@ import io.github.libxposed.api.XposedModule;
  */
 public final class SmsBridge {
 
+
+    /** 模块 App 自身的包名，跨进程拉起注入服务时用（本文件运行在被 Hook 的进程里，不引用模块类） */
+    private static final String MODULE_PKG = "com.autofill.sms";
 
     public static final String ACTION_CODE = "com.autofill.sms.CODE_RECEIVED";
     /**
@@ -62,7 +68,16 @@ public final class SmsBridge {
 
     /**
      * 让模块自己的 App 用 root 执行 {@code input text} 注入验证码。
-     * 显式广播（setPackage）——Android 8+ 仍允许显式广播唤醒静态注册的接收器。
+     * <p>
+     * 两条路都发，靠模块 App 侧的 5 秒去重保证只填一次——因为它们各有各的坑：
+     * <ul>
+     *   <li><b>广播</b>：App 处于 stopped（装完 / 开机后一次都没打开过）时
+     *       <b>完全收不到</b>，实测显式 {@code setPackage} 加
+     *       {@code FLAG_INCLUDE_STOPPED_PACKAGES}、用 root 发送也送不进去；</li>
+     *   <li><b>绑定</b>：不受 stopped 限制，但会被 Thanox 之类的后台管理模块拦截
+     *       （真机日志 {@code Thanox-Core: bindServiceLocked block ...}）。</li>
+     * </ul>
+     * 两条都发，任意一条通就能填；都通时后到的那条被去重吞掉。
      */
     private static void requestRootFill(String code) {
         if (!HookConfig.autoFill() || !HookConfig.rootFill()) {
@@ -73,14 +88,55 @@ public final class SmsBridge {
             return;
         }
         try {
+            Intent bind = new Intent()
+                    .setComponent(new ComponentName(MODULE_PKG, MODULE_PKG + ".RootFillService"))
+                    .putExtra(EXTRA_CODE, code);
+            boolean bound = ctx.bindService(bind, new FillConnection(ctx), Context.BIND_AUTO_CREATE);
+            ModuleMain.log(Log.INFO, "root fill: bind requested to " + MODULE_PKG
+                    + " | accepted=" + bound);
+        } catch (Throwable t) {
+            ModuleMain.log(Log.WARN, "root fill: bindService failed: " + t);
+        }
+        try {
             Intent intent = new Intent(ACTION_ROOT_FILL)
                     .putExtra(EXTRA_CODE, code)
-                    .setPackage("com.autofill.sms")
-                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+                    .setPackage(MODULE_PKG)
+                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND
+                            | Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
             ctx.sendBroadcast(intent);
-            ModuleMain.log(Log.INFO, "root fill requested");
+            ModuleMain.log(Log.INFO, "root fill requested (broadcast)");
         } catch (Throwable t) {
             ModuleMain.log(Log.ERROR, "root fill request failed", t);
+        }
+    }
+
+    /** 绑定成功后立刻解绑：注入已经在服务的 onBind 里同步做完了 */
+    private static final class FillConnection implements ServiceConnection {
+
+        private final Context ctx;
+
+        FillConnection(Context ctx) {
+            this.ctx = ctx;
+        }
+
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            try {
+                ctx.unbindService(this);
+            } catch (Throwable ignored) {
+                // 解绑失败不影响已经完成的注入
+            }
+            ModuleMain.log(Log.INFO, "root fill: service connected");
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            // 不做任何事：一次性调用
+        }
+
+        @Override
+        public void onBindingDied(ComponentName name) {
+            // 不做任何事：一次性调用
         }
     }
 

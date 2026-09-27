@@ -86,6 +86,7 @@ sdk.dir=/path/to/Android/sdk
    - `com.android.phone` 负责短信解析、复制与拦截；
    - **填入必须在目标 App 自己的进程里执行**，所以该 App 必须单独勾选。每换一个 App 就要勾一次，勾完重启一次即长期有效。
    - 作用域列表里那个「Android 系统 / 系统框架」对应的包名就是 `android`，注入后日志显示为 `process=system`（即 system_server）。**LSPosed 2.x 的现代模块不会因为它而自动覆盖所有 App 进程**——真机验证：勾了 `android` 后只看到 `process=system` 和 `process=com.android.phone` 两个进程，第三方 App 一个都没被注入。
+   - **本模块自己（com.autofill.sms）不需要、也不会出现在作用域列表里**：它自己的那部分工作（root 注入）是普通 Android 组件完成的，不靠 Xposed 注入。
    - 若确实想对所有 App 生效，可在 LSPosed 设置里开启「全局作用域」（如有该选项），或逐个勾选；
 4. 重启手机（软重启不够）；
 5. 打开一次本应用，确认顶部显示「框架已连接」，按需调整设置。
@@ -116,23 +117,32 @@ getInvoker / getRemotePreferences / 远程文件），所以模块无法自行�
 
 ### 不想逐个勾 App？用 root 注入（默认开启）
 
-没人接管验证码时，模块 App 会收到显式广播，用 root 执行 `input text <验证码>`——
-按键由 system_server 的 InputDispatcher 分发给**当前焦点窗口**，与目标 App 是否被
-注入完全无关。因此：
+没人接管验证码时，短信进程会**同时**走两条路去触发本应用，由模块 App 用 root 执行
+`input text <验证码>`——按键由 system_server 的 InputDispatcher 分发给**当前焦点窗口**，
+与目标 App 是否被注入完全无关。因此：
 
-- **不用把目标 App 勾进作用域**，作用域只需 `com.android.phone` + 本模块自身；
+- **不用把目标 App 勾进作用域，作用域里只要有 `com.android.phone` 就够了**；
+- **模块自身（com.autofill.sms）不需要、也不在 LSPosed 的作用域列表里**——
+  `RootFillService` / `RootFillReceiver` 是本应用自己的普通 Android 组件，靠显式绑定 /
+  显式广播被调用，**与 Xposed 注入没有任何关系**；
 - **对 Compose / Flutter 自绘控件同样有效**（它们一样接收按键事件）；
 - 不受 Android 版本影响（`input` 是系统命令，不涉及 hook 系统内部类）。
 
 前提与限制：
 
 1. 在 root 管理器（KernelSU / Magisk）里给本应用**授予 root 权限**；
-2. **安装或 force-stop 后，先手动打开一次本应用**——Android 会把未启动过的 App
-   置于 stopped state，此状态下收不到任何广播，root 注入会静默失效；
+2. **装完 / 升级后手动打开一次本应用**是最稳的做法。原因是 Android 会给没启动过的应用
+   打上 stopped 标记，实测该状态下**任何广播都送不进去**（显式 `setPackage` 加
+   `FLAG_INCLUDE_STOPPED_PACKAGES`、甚至用 root 发送都被拦）。为此模块做了两件事：
+   - 短信进程额外用显式 `bindService` 拉起 `RootFillService`（"显式启动组件"不受 stopped
+     限制）——但这条路**会被 Thanox 之类的后台管理模块拦掉**（真机日志
+     `Thanox-Core: bindServiceLocked block ...`），所以两条路都要发，谁通谁填，
+     模块侧有 5 秒去重保证不会填两遍；
+   - 加了 `BOOT_COMPLETED` 接收器：开机收到一次系统广播即可解除 stopped 标记。
 3. 输入框需要有焦点（先点进输入框再等验证码）；
 4. 验证码拼进 shell 前只允许 `[0-9A-Za-z]{3,16}`——这不是格式校验，而是安全底线，
    防止恶意短信构造内容以 root 执行任意命令；
-5. 每次 注入会 fork 一个 `su` 进程（约 0.5~1s），不会重试，避免验证码被填两遍。
+5. 每次注入会 fork 一个 `su` 进程（约 0.5~1s），不会重试，避免验证码被填两遍。
 
 设置页有开关（「无人接管时用 root 注入」），并会实时显示 root 是否可用。
 
@@ -164,6 +174,9 @@ Windows PowerShell 里没有 `grep`，不要写 `adb logcat | grep AutoFillSms`�
 - `code received in <包名> | foreground=true | autoFill=true` —— **foreground 为 false 说明前台判定失败，填入不会执行**
 - `candidate inputs: N` —— 界面上找到的可见输入框数量
 - `filled via focused EditText` / `scored EditText` / `webview` / `split boxes` —— 填入成功及所用路径
+- `root fill: bind requested to com.autofill.sms | accepted=true` —— 已请求绑定注入服务
+- `root fill sent: <验证码>` / `root fill FAILED: <验证码>` —— root 注入成功 / 失败
+- `root fill skipped (same code just injected)` —— 同一验证码 5 秒内重复触发被去重
 - `no input found — 可能是 Compose / Flutter / 自绘控件，无法填入`
 - `SMS blocked (verification code intercepted)`
 
@@ -179,7 +192,9 @@ Windows PowerShell 里没有 `grep`，不要写 `adb logcat | grep AutoFillSms`�
 | 多个输入框、且特征都不像验证码框 | `candidate inputs: N` 但没填 | 打开"关键词"设置，把该页面的输入框提示词加进去 |
 | **目标 App 没勾进作用域**（最常见） | 日志里没有 `package ready: <该 App>`，也没有对应进程的 `onModuleLoaded` | 在 LSPosed 作用域里**勾选该 App 本身**，重启 |
 | **全部日志都是同一个进程打的**（只有 `code detected` + 反复 `fill skipped: no resumed activity`，PID 相同） | 没有任何 App 进程被注入，广播无人接管，短信进程只能自己兜底——而它没有界面 | 把**目标 App** 加进作用域；只勾 `com.android.phone` 能复制但填不了（勾 `android` 也不够） |
-| 键盘/悬浮窗抢占焦点 | 填入不完整 | 关闭剪贴板监听类 App，或关掉"自动复制" |
+| **作用域里没有本模块（com.autofill.sms）** | 正常，也不需要 | 模块自身不会被 LSPosed 列进作用域；root 注入用的是普通 Android 组件（显式 bind / 广播），与 Xposed 注入无关 |
+| **装完没打开过本应用** | 收不到任何广播，root 注入静默失效 | 打开一次本应用（解除 stopped 标记），见上文第 2 条 |
+| **装了 Thanox / 类似后台管理工具** | 日志出现 `Thanox-Core: bindServiceLocked block` | 绑定通道被拦；把本应用加入其白名单，或至少打开一次本应用让广播通道可用 |
 
 ## 许可证
 
