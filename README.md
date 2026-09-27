@@ -92,6 +92,28 @@ sdk.dir=/path/to/Android/sdk
 
 > 只勾 `com.android.phone` 时：**复制能用，填入不能用**——因为复制在电话进程完成，而填入需要目标 App 进程里有模块。
 
+### 为什么不能像 Thanox 那样只勾「系统框架」
+
+LSPosed 的作用域机制（见 daemon `ConfigManager#cacheScopes` / `getAssociatedProcesses`）是
+**「包名 → 该包名所属进程」的精确映射**，代码里没有任何"全局"分支：
+
+```java
+// system_server 走单独路径，普通包按自己的进程展开
+if (app.packageName.equals("system")) continue;
+for (ProcessScope ps : getAssociatedProcesses(app)) cachedScope.get(ps).add(module);
+```
+
+而且数据库迁移把旧的 `android` 包名改写成了 `system`（`UPDATE scope SET app_pkg_name='system'
+WHERE app_pkg_name='android'`），`system` 只对应 system_server。
+
+Thanox 只勾「系统框架」就能管理其他应用，是因为它的后台管理/自启动/权限控制**全部是 hook
+system_server 里的 AMS、PMS 等系统服务实现的**，不需要进入目标 App 进程。而**自动填入必须在
+目标 App 进程里操作它的 `EditText`**——system_server 里没有目标 App 的 View，跨进程做不到。
+
+另外，libxposed API 未提供任何操作作用域的方法（接口只有 hook / log / deoptimize /
+getInvoker / getRemotePreferences / 远程文件），所以模块无法自行把自己加入某个包的作用域，
+必须由用户在管理器里勾选。
+
 ## 已知限制
 
 - 短信拦截点在 `InboundSmsHandler#dispatchIntent`，极少数深度定制 ROM 若改名该方法，拦截与自动识别会失效（可查看 LSPosed 日志 `AutoFillSms`，会打印 hook 到的重载数量）。
