@@ -87,6 +87,11 @@ public final class HookConfig {
         return bool(Config.KEY_BLOCK_SMS, Config.DEF_BLOCK_SMS);
     }
 
+    /** 无人接管验证码时，改用 root 的 {@code input text} 全局注入 */
+    public static boolean rootFill() {
+        return bool(Config.KEY_ROOT_FILL, Config.DEF_ROOT_FILL);
+    }
+
     public static String regex() {
         return str(Config.KEY_REGEX, Config.DEF_REGEX);
     }

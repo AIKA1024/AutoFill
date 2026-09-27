@@ -24,6 +24,11 @@ public final class Config {
     public static final String KEY_SHOW_TOAST = "show_toast";
     public static final String KEY_SHOW_NOTIFICATION = "show_notification";
     public static final String KEY_BLOCK_SMS = "block_sms";
+    /**
+     * 无人接管验证码时，改用 root 执行 {@code input text} 全局注入。
+     * 这样无需把目标 App 勾进作用域（按键由系统分发给当前焦点窗口）。
+     */
+    public static final String KEY_ROOT_FILL = "root_fill";
     public static final String KEY_REGEX = "regex";
     public static final String KEY_KEYWORDS = "keywords";
     public static final String KEY_BLACKLIST = "blacklist";
@@ -35,6 +40,7 @@ public final class Config {
     public static final boolean DEF_SHOW_TOAST = true;
     public static final boolean DEF_SHOW_NOTIFICATION = true;
     public static final boolean DEF_BLOCK_SMS = false;
+    public static final boolean DEF_ROOT_FILL = true;
 
     /** 默认正则：4~8 位纯数字，且前后不能再接数字（避免命中订单号/手机号片段） */
     public static final String DEF_REGEX = "(?<![0-9])[0-9]{4,8}(?![0-9])";

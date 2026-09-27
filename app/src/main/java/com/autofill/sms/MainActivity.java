@@ -11,6 +11,10 @@ import android.widget.EditText;
 import android.widget.Switch;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.util.concurrent.TimeUnit;
+
 import io.github.libxposed.service.XposedService;
 
 /**
@@ -25,6 +29,7 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
     private Switch swToast;
     private Switch swNotification;
     private Switch swBlock;
+    private Switch swRootFill;
 
     private EditText etRegex;
     private EditText etKeywords;
@@ -33,6 +38,7 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
 
     private TextView tvStatus;
     private TextView tvResult;
+    private TextView tvRootHint;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable saveTask = this::saveValues;
@@ -50,6 +56,7 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
         swToast = findViewById(R.id.sw_toast);
         swNotification = findViewById(R.id.sw_notification);
         swBlock = findViewById(R.id.sw_block);
+        swRootFill = findViewById(R.id.sw_root_fill);
 
         etRegex = findViewById(R.id.et_regex);
         etKeywords = findViewById(R.id.et_keywords);
@@ -58,6 +65,7 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
 
         tvStatus = findViewById(R.id.tv_status);
         tvResult = findViewById(R.id.tv_result);
+        tvRootHint = findViewById(R.id.tv_root_hint);
 
         Button btnRegexReset = findViewById(R.id.btn_regex_reset);
         Button btnKeywordsReset = findViewById(R.id.btn_keywords_reset);
@@ -72,6 +80,7 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
         swToast.setOnCheckedChangeListener((v, checked) -> onChanged());
         swNotification.setOnCheckedChangeListener((v, checked) -> onChanged());
         swBlock.setOnCheckedChangeListener((v, checked) -> onChanged());
+        swRootFill.setOnCheckedChangeListener((v, checked) -> onChanged());
 
         etRegex.addTextChangedListener(watcher);
         etKeywords.addTextChangedListener(watcher);
@@ -88,6 +97,37 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
         btnTest.setOnClickListener(v -> runTest());
 
         App.addListener(this, true);
+
+        checkRootAvailability();
+    }
+
+    /** 探测本应用能否拿到 root——决定「root 注入」这条路走不走得通 */
+    private void checkRootAvailability() {
+        tvRootHint.setText("正在检测 root 注入可用性…");
+        new Thread(() -> {
+            String result;
+            try {
+                Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "id -u"});
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                    String line;
+                    while ((line = r.readLine()) != null) {
+                        sb.append(line.trim());
+                    }
+                }
+                boolean finished = p.waitFor(8, TimeUnit.SECONDS);
+                boolean ok = finished && p.exitValue() == 0 && "0".equals(sb.toString().trim());
+                result = ok
+                        ? "root 注入可用：无需把目标 App 勾进作用域，验证码会以按键方式填入当前焦点输入框"
+                                + "（需先点进输入框，对自绘控件同样有效）。"
+                        : "拿不到 root：请在 KernelSU 管理器里给本应用授予 root 权限；"
+                                + "未授权时只能靠「把目标 App 勾进作用域 + setText」填入。";
+            } catch (Throwable t) {
+                result = "root 检测异常：" + t;
+            }
+            final String hint = result;
+            runOnUiThread(() -> tvRootHint.setText(hint));
+        }, "root-probe").start();
     }
 
     @Override
@@ -140,6 +180,7 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
         swToast.setChecked(ConfigStore.getBoolean(this, Config.KEY_SHOW_TOAST, Config.DEF_SHOW_TOAST));
         swNotification.setChecked(ConfigStore.getBoolean(this, Config.KEY_SHOW_NOTIFICATION, Config.DEF_SHOW_NOTIFICATION));
         swBlock.setChecked(ConfigStore.getBoolean(this, Config.KEY_BLOCK_SMS, Config.DEF_BLOCK_SMS));
+        swRootFill.setChecked(ConfigStore.getBoolean(this, Config.KEY_ROOT_FILL, Config.DEF_ROOT_FILL));
 
         etRegex.setText(ConfigStore.getString(this, Config.KEY_REGEX, Config.DEF_REGEX));
         etKeywords.setText(ConfigStore.getString(this, Config.KEY_KEYWORDS, Config.DEF_KEYWORDS));
@@ -155,6 +196,7 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
         ConfigStore.putBoolean(this, Config.KEY_SHOW_TOAST, swToast.isChecked());
         ConfigStore.putBoolean(this, Config.KEY_SHOW_NOTIFICATION, swNotification.isChecked());
         ConfigStore.putBoolean(this, Config.KEY_BLOCK_SMS, swBlock.isChecked());
+        ConfigStore.putBoolean(this, Config.KEY_ROOT_FILL, swRootFill.isChecked());
 
         ConfigStore.putString(this, Config.KEY_REGEX, etRegex.getText().toString());
         ConfigStore.putString(this, Config.KEY_KEYWORDS, etKeywords.getText().toString());

@@ -23,6 +23,12 @@ public final class SmsBridge {
 
 
     public static final String ACTION_CODE = "com.autofill.sms.CODE_RECEIVED";
+    /**
+     * 请求 root 全局注入的 action（值与 {@code RootFillReceiver.ACTION} 相同）。
+     * 这里用字面量而不是引用该类：本文件运行在被 Hook 的进程里，而 RootFillReceiver
+     * 是模块 App 自己的组件，避免产生不必要的类依赖。
+     */
+    public static final String ACTION_ROOT_FILL = "com.autofill.sms.ROOT_FILL";
     public static final String EXTRA_CODE = "code";
     public static final String EXTRA_SENDER = "sender";
     public static final String EXTRA_BODY = "body";
@@ -54,6 +60,30 @@ public final class SmsBridge {
         }
     }
 
+    /**
+     * 让模块自己的 App 用 root 执行 {@code input text} 注入验证码。
+     * 显式广播（setPackage）——Android 8+ 仍允许显式广播唤醒静态注册的接收器。
+     */
+    private static void requestRootFill(String code) {
+        if (!HookConfig.autoFill() || !HookConfig.rootFill()) {
+            return;
+        }
+        Context ctx = AppHooks.getAppContext();
+        if (ctx == null) {
+            return;
+        }
+        try {
+            Intent intent = new Intent(ACTION_ROOT_FILL)
+                    .putExtra(EXTRA_CODE, code)
+                    .setPackage("com.autofill.sms")
+                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+            ctx.sendBroadcast(intent);
+            ModuleMain.log(Log.INFO, "root fill requested");
+        } catch (Throwable t) {
+            ModuleMain.log(Log.ERROR, "root fill request failed", t);
+        }
+    }
+
     /** 有序广播的终点：判断是否有前台 App 处理过 */
     static final class FallbackReceiver extends BroadcastReceiver {
 
@@ -80,10 +110,11 @@ public final class SmsBridge {
             Handler main = new Handler(Looper.getMainLooper());
             if (!handled) {
                 // 没有任何应用进程接走验证码。正常情况（桌面/息屏）会走到这里；
-                // 若此刻明明有 App 在前台，说明该 App 进程没被注入 —— 几乎都是作用域没勾「系统框架」。
+                // 若此刻明明有 App 在前台，说明该 App 没被勾进作用域 —— 这时改用 root 注入兜底：
+                // 按键由系统 InputDispatcher 分发给当前焦点窗口，与目标 App 是否被注入无关。
                 ModuleMain.log(Log.WARN, "no app process handled the code, fallback in "
-                        + ctx.getPackageName()
-                        + " — 若此刻前台有 App，检查 LSPosed 作用域是否勾选「系统框架 android」");
+                        + ctx.getPackageName());
+                requestRootFill(code);
                 main.post(() -> Actions.onCode(module, ctx, ctx.getPackageName(), code, sender, body));
             } else if (needNotify) {
                 // 前台应用没有通知权限，这里代发通知

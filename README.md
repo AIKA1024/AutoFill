@@ -114,6 +114,28 @@ system_server 里的 AMS、PMS 等系统服务实现的**，不需要进入目�
 getInvoker / getRemotePreferences / 远程文件），所以模块无法自行把自己加入某个包的作用域，
 必须由用户在管理器里勾选。
 
+### 不想逐个勾 App？用 root 注入（默认开启）
+
+没人接管验证码时，模块 App 会收到显式广播，用 root 执行 `input text <验证码>`——
+按键由 system_server 的 InputDispatcher 分发给**当前焦点窗口**，与目标 App 是否被
+注入完全无关。因此：
+
+- **不用把目标 App 勾进作用域**，作用域只需 `com.android.phone` + 本模块自身；
+- **对 Compose / Flutter 自绘控件同样有效**（它们一样接收按键事件）；
+- 不受 Android 版本影响（`input` 是系统命令，不涉及 hook 系统内部类）。
+
+前提与限制：
+
+1. 在 root 管理器（KernelSU / Magisk）里给本应用**授予 root 权限**；
+2. **安装或 force-stop 后，先手动打开一次本应用**——Android 会把未启动过的 App
+   置于 stopped state，此状态下收不到任何广播，root 注入会静默失效；
+3. 输入框需要有焦点（先点进输入框再等验证码）；
+4. 验证码拼进 shell 前只允许 `[0-9A-Za-z]{3,16}`——这不是格式校验，而是安全底线，
+   防止恶意短信构造内容以 root 执行任意命令；
+5. 每次 注入会 fork 一个 `su` 进程（约 0.5~1s），不会重试，避免验证码被填两遍。
+
+设置页有开关（「无人接管时用 root 注入」），并会实时显示 root 是否可用。
+
 ## 已知限制
 
 - 短信拦截点在 `InboundSmsHandler#dispatchIntent`，极少数深度定制 ROM 若改名该方法，拦截与自动识别会失效（可查看 LSPosed 日志 `AutoFillSms`，会打印 hook 到的重载数量）。

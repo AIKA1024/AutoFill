@@ -22,6 +22,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            接收短信进程发来的显式广播，用 root 执行 input text 注入验证码。
+            exported=true：短信进程（com.android.phone）需要跨进程调用它。
+            显式广播（setPackage）在 Android 8+ 仍可唤醒静态注册的接收器，因此 App
+            未运行时也能被拉起执行注入。
+        -->
+        <receiver
+            android:name=".RootFillReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.autofill.sms.ROOT_FILL" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
