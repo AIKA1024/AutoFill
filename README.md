@@ -131,18 +131,42 @@ getInvoker / getRemotePreferences / 远程文件），所以模块无法自行�
 前提与限制：
 
 1. 在 root 管理器（KernelSU / Magisk）里给本应用**授予 root 权限**；
-2. **装完 / 升级后手动打开一次本应用**是最稳的做法。原因是 Android 会给没启动过的应用
-   打上 stopped 标记，实测该状态下**任何广播都送不进去**（显式 `setPackage` 加
-   `FLAG_INCLUDE_STOPPED_PACKAGES`、甚至用 root 发送都被拦）。为此模块做了两件事：
-   - 短信进程额外用显式 `bindService` 拉起 `RootFillService`（"显式启动组件"不受 stopped
-     限制）——但这条路**会被 Thanox 之类的后台管理模块拦掉**（真机日志
-     `Thanox-Core: bindServiceLocked block ...`），所以两条路都要发，谁通谁填，
-     模块侧有 5 秒去重保证不会填两遍；
-   - 加了 `BOOT_COMPLETED` 接收器：开机收到一次系统广播即可解除 stopped 标记。
+2. **装完 / 升级后必须手动打开一次本应用**（一次性，之后永久有效，重启也不会退回）。
+   原因：Android 3.1 起，从未启动过（或被 force-stop）的应用处于 stopped 状态，
+   **收不到任何广播**——包括显式 `setPackage` 广播、加
+   `FLAG_INCLUDE_STOPPED_PACKAGES` 的广播、**甚至 `BOOT_COMPLETED`**（系统广播一律默认
+   `FLAG_EXCLUDE_STOPPED_PACKAGES`）。实测用 root 身份发送也一样被拦。
+   ⇒ 想跳过这一步，只能走**显式启动组件**（`bindService`），它不受 stopped 限制，
+   模块里 `RootFillService` 就是干这个的——但它会被 Thanox 之类的工具拦掉，见下条；
 3. 输入框需要有焦点（先点进输入框再等验证码）；
 4. 验证码拼进 shell 前只允许 `[0-9A-Za-z]{3,16}`——这不是格式校验，而是安全底线，
    防止恶意短信构造内容以 root 执行任意命令；
 5. 每次注入会 fork 一个 `su` 进程（约 0.5~1s），不会重试，避免验证码被填两遍。
+
+### 装了 Thanox：放行 `bindService`（可选）
+
+Thanox 的「**后台启动**」功能拦截的就是应用间的关联启动（bind / start），真机日志里长这样：
+
+```
+Thanox-Core: bindServiceLocked block, checkRes false com.autofill.sms/.RootFillService 1001 0
+```
+
+放行三选一（Thanox 8.x 菜单名）：
+
+1. **看原因**：Thanox → 后台启动 → 右上角菜单 → **启动记录** → 点中间大数字进详情，
+   找到 `com.autofill.sms` 那条。`BYPASS_PROCESS_RUNNING`（目标已在运行，放行）、
+   `BLOCKED_STANDBY`（智能待机/乖巧模式把它休眠了）、`BLOCKED_IN_BLOCK_LIST`（你手动关过）
+   等一目了然——**只要本应用进程在跑，Thanox 是直接放行的**，这也是"打开一次就够"的原因之一。
+2. **加规则**（推荐，最精确）：后台启动 → 规则 → 添加
+   ```
+   ALLOW com.android.phone com.autofill.sms
+   ```
+   语法是 `ALLOW|DENY <启动者包名> <目标包名>`，支持 `ALLOW android *`、`SHELL`、`ROOT` 等写法。
+3. **关掉对本应用的限制**：后台启动的 app 列表里把本应用打开（Thanox 默认全部允许），
+   并关闭它的智能待机 / 乖巧模式。
+
+不放行也不影响使用——只要打开过一次本应用，广播通道就通了；Thanox 放行只是让
+`bindService` 那条"免启动"的备用通道也能用。
 
 设置页有开关（「无人接管时用 root 注入」），并会实时显示 root 是否可用。
 
@@ -193,7 +217,7 @@ Windows PowerShell 里没有 `grep`，不要写 `adb logcat | grep AutoFillSms`�
 | **目标 App 没勾进作用域**（最常见） | 日志里没有 `package ready: <该 App>`，也没有对应进程的 `onModuleLoaded` | 在 LSPosed 作用域里**勾选该 App 本身**，重启 |
 | **全部日志都是同一个进程打的**（只有 `code detected` + 反复 `fill skipped: no resumed activity`，PID 相同） | 没有任何 App 进程被注入，广播无人接管，短信进程只能自己兜底——而它没有界面 | 把**目标 App** 加进作用域；只勾 `com.android.phone` 能复制但填不了（勾 `android` 也不够） |
 | **作用域里没有本模块（com.autofill.sms）** | 正常，也不需要 | 模块自身不会被 LSPosed 列进作用域；root 注入用的是普通 Android 组件（显式 bind / 广播），与 Xposed 注入无关 |
-| **装完没打开过本应用** | 收不到任何广播，root 注入静默失效 | 打开一次本应用（解除 stopped 标记），见上文第 2 条 |
+| **装完没打开过本应用** | 收不到任何广播（含开机广播），root 注入静默失效 | 打开一次本应用：**一次性，之后永久有效**；想跳过只能靠下面那条 bind 通道 |
 | **装了 Thanox / 类似后台管理工具** | 日志出现 `Thanox-Core: bindServiceLocked block` | 绑定通道被拦；把本应用加入其白名单，或至少打开一次本应用让广播通道可用 |
 
 ## 许可证
