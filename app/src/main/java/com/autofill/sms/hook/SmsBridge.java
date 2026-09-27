@@ -21,7 +21,6 @@ import io.github.libxposed.api.XposedModule;
  */
 public final class SmsBridge {
 
-    private static final String TAG = ModuleMain.TAG;
 
     public static final String ACTION_CODE = "com.autofill.sms.CODE_RECEIVED";
     public static final String EXTRA_CODE = "code";
@@ -38,7 +37,7 @@ public final class SmsBridge {
     public static void dispatch(XposedModule module, String code, String sender, String body) {
         Context ctx = AppHooks.getAppContext();
         if (ctx == null) {
-            module.log(Log.WARN, TAG, "no context in sms process, skip dispatch");
+            ModuleMain.log(Log.WARN, "no context in sms process, skip dispatch");
             return;
         }
         Intent intent = new Intent(ACTION_CODE)
@@ -51,7 +50,7 @@ public final class SmsBridge {
                     new FallbackReceiver(module, ctx, code, sender, body),
                     null, RESULT_NONE, null, new Bundle());
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "sendOrderedBroadcast failed", t);
+            ModuleMain.log(Log.ERROR, "sendOrderedBroadcast failed", t);
         }
     }
 

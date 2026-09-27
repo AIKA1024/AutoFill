@@ -21,7 +21,6 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam;
  */
 public final class SmsHooks {
 
-    private static final String TAG = ModuleMain.TAG;
     private static final String CLASS_INBOUND = "com.android.internal.telephony.InboundSmsHandler";
     private static final String METHOD_DISPATCH = "dispatchIntent";
 
@@ -60,10 +59,10 @@ public final class SmsHooks {
                 module.hook(m).intercept(chain -> onDispatch(module, chain));
                 hooked++;
             } catch (Throwable t) {
-                module.log(Log.ERROR, TAG, "hook " + METHOD_DISPATCH + " failed: " + m, t);
+                ModuleMain.log(Log.ERROR, "hook " + METHOD_DISPATCH + " failed: " + m, t);
             }
         }
-        module.log(Log.INFO, TAG, "InboundSmsHandler hooked: " + hooked + " overload(s) in "
+        ModuleMain.log(Log.INFO, "InboundSmsHandler hooked: " + hooked + " overload(s) in "
                 + param.getPackageName());
     }
 
@@ -81,11 +80,11 @@ public final class SmsHooks {
             try {
                 block = process(module, intent);
             } catch (Throwable t) {
-                module.log(Log.ERROR, TAG, "process sms failed", t);
+                ModuleMain.log(Log.ERROR, "process sms failed", t);
             }
         }
         if (block) {
-            module.log(Log.INFO, TAG, "SMS blocked (verification code intercepted)");
+            ModuleMain.log(Log.INFO, "SMS blocked (verification code intercepted)");
             // void 方法，不调用 proceed 即拦截
             return null;
         }
@@ -134,7 +133,7 @@ public final class SmsHooks {
         sLastTime = now;
 
         String sender = sms.getOriginatingAddress();
-        module.log(Log.INFO, TAG, "code detected: " + code + " from " + sender);
+        ModuleMain.log(Log.INFO, "code detected: " + code + " from " + sender);
 
         SmsBridge.dispatch(module, code, sender, body);
         return HookConfig.blockSms();

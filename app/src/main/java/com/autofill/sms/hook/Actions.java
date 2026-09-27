@@ -37,7 +37,6 @@ import io.github.libxposed.api.XposedModule;
  */
 public final class Actions {
 
-    private static final String TAG = ModuleMain.TAG;
     private static final String CHANNEL_ID = "sms_code";
     private static final String CHANNEL_NAME = "验证码";
     private static final int NOTIFY_ID = 20240906;
@@ -121,7 +120,7 @@ public final class Actions {
                     .setDefaults(Notification.DEFAULT_LIGHTS);
             nm.notify(NOTIFY_ID, builder.build());
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "notify failed", t);
+            ModuleMain.log(Log.ERROR, "notify failed", t);
         }
     }
 
@@ -133,7 +132,7 @@ public final class Actions {
                 cm.setPrimaryClip(ClipData.newPlainText("sms_code", text));
             }
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "copy failed", t);
+            ModuleMain.log(Log.ERROR, "copy failed", t);
         }
     }
 
@@ -174,7 +173,7 @@ public final class Actions {
         try {
             Activity activity = AppHooks.getResumedActivity();
             if (activity == null) {
-                module.log(Log.WARN, TAG, "fill skipped: no resumed activity");
+                ModuleMain.log(Log.WARN, "fill skipped: no resumed activity");
                 return;
             }
             View decor = activity.getWindow() == null
@@ -202,7 +201,7 @@ public final class Actions {
             }
 
             List<EditText> editors = collect(decor);
-            module.log(Log.INFO, TAG, "candidate inputs: " + editors.size());
+            ModuleMain.log(Log.INFO, "candidate inputs: " + editors.size());
 
             // 3) 多格 OTP（6 个单字符框那种）
             if (fillSplitBoxes(editors, code)) {
@@ -220,16 +219,15 @@ public final class Actions {
                 return;
             }
 
-            module.log(Log.WARN, TAG,
-                    "no input found — 可能是 Compose / Flutter / 自绘控件，无法填入");
+            ModuleMain.log(Log.WARN, "no input found — 可能是 Compose / Flutter / 自绘控件，无法填入");
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "fill failed", t);
+            ModuleMain.log(Log.ERROR, "fill failed", t);
         }
     }
 
     private static void done(XposedModule module, String code, String how) {
         sLastFilled = code;
-        module.log(Log.INFO, TAG, "filled via " + how);
+        ModuleMain.log(Log.INFO, "filled via " + how);
     }
 
     /**
@@ -506,7 +504,7 @@ public final class Actions {
                 webView.getSettings().setJavaScriptEnabled(true);
             }
             webView.evaluateJavascript(js, value ->
-                    module.log(Log.INFO, TAG, "webview fill result: " + value));
+                    ModuleMain.log(Log.INFO, "webview fill result: " + value));
             if (!original) {
                 // 填完把 JS 开关恢复原样，避免长期改变应用行为
                 MAIN.postDelayed(() -> {
@@ -518,7 +516,7 @@ public final class Actions {
             }
             return true;
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "webview fill failed", t);
+            ModuleMain.log(Log.ERROR, "webview fill failed", t);
             return false;
         }
     }

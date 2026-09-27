@@ -89,7 +89,18 @@ sdk.dir=/path/to/Android/sdk
 
 ## 日志排查
 
-`adb logcat | grep AutoFillSms` 或 LSPosed 管理器 → 日志，关键输出：
+模块日志**同时写入 logcat 和 LSPosed 自己的日志系统**，两条路都能看：
+
+```bash
+adb logcat -s AutoFillSms:*          # logcat（Linux/macOS/Windows 通用，不需要 grep）
+```
+
+Windows PowerShell 里没有 `grep`，不要写 `adb logcat | grep AutoFillSms`，直接用上面那条 `-s` 过滤即可。
+也可以看 LSPosed 管理器 → 日志页。
+
+> **一条日志都没有 = 模块没被注入任何进程。** 按序检查：LSPosed 里模块开关是否打开 →
+> 作用域是否勾了 **系统框架（android）** 和 **Phone（com.android.phone）** → 是否**重启过手机**
+> （软重启不够）。确认后随便打开一个 App，应该立刻看到 `code receiver registered in <包名>`。
 
 - `onModuleLoaded | process=... | framework=... | api=...`
 - `InboundSmsHandler hooked: N overload(s) in com.android.phone`

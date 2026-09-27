@@ -35,7 +35,6 @@ import io.github.libxposed.api.XposedModuleInterface.PackageReadyParam;
  */
 public final class AppHooks {
 
-    private static final String TAG = ModuleMain.TAG;
 
     /** 验证码在内存中保留多久，用于"先收到短信、后点输入框"的场景 */
     private static final long PENDING_TTL = 120_000L;
@@ -90,12 +89,12 @@ public final class AppHooks {
                     sAppContext = ctx;
                     registerReceiver(module, ctx);
                 } catch (Throwable t) {
-                    module.log(Log.ERROR, TAG, "application init failed", t);
+                    ModuleMain.log(Log.ERROR, "application init failed", t);
                 }
                 return result;
             });
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "hook Application#onCreate failed", t);
+            ModuleMain.log(Log.ERROR, "hook Application#onCreate failed", t);
         }
     }
 
@@ -119,7 +118,7 @@ public final class AppHooks {
                 return chain.proceed();
             });
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "hook Activity lifecycle failed", t);
+            ModuleMain.log(Log.ERROR, "hook Activity lifecycle failed", t);
         }
     }
 
@@ -136,12 +135,12 @@ public final class AppHooks {
                         fillOnFocus(module, (EditText) chain.getThisObject());
                     }
                 } catch (Throwable t) {
-                    module.log(Log.ERROR, TAG, "focus fill failed", t);
+                    ModuleMain.log(Log.ERROR, "focus fill failed", t);
                 }
                 return result;
             });
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "hook TextView#onFocusChanged failed", t);
+            ModuleMain.log(Log.ERROR, "hook TextView#onFocusChanged failed", t);
         }
     }
 
@@ -167,7 +166,7 @@ public final class AppHooks {
         if (hintMatch || numeric || Actions.isLikelyCodeField(editText) || age <= FRESH_TTL) {
             Actions.setText(editText, code);
             sPendingCode = null;
-            module.log(Log.INFO, TAG, "filled on focus in " + sPackageName);
+            ModuleMain.log(Log.INFO, "filled on focus in " + sPackageName);
         }
     }
 
@@ -185,9 +184,9 @@ public final class AppHooks {
             } else {
                 ctx.registerReceiver(receiver, filter);
             }
-            module.log(Log.INFO, TAG, "code receiver registered in " + ctx.getPackageName());
+            ModuleMain.log(Log.INFO, "code receiver registered in " + ctx.getPackageName());
         } catch (Throwable t) {
-            module.log(Log.ERROR, TAG, "register receiver failed", t);
+            ModuleMain.log(Log.ERROR, "register receiver failed", t);
         }
     }
 
@@ -221,7 +220,7 @@ public final class AppHooks {
             sPendingMillis = System.currentTimeMillis();
 
             boolean foreground = isForeground();
-            module.log(Log.INFO, TAG, "code received in " + sPackageName
+            ModuleMain.log(Log.INFO, "code received in " + sPackageName
                     + " | foreground=" + foreground
                     + " | autoFill=" + HookConfig.autoFill());
 
