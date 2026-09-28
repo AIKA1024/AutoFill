@@ -101,34 +101,54 @@ public class MainActivity extends Activity implements App.ServiceStateListener {
         checkRootAvailability();
     }
 
-    /** 探测本应用能否拿到 root——决定「root 注入」这条路走不走得通 */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 用户可能刚在 root 管理器里授权完返回，重新探测一次，别让界面停留在旧结论
+        checkRootAvailability();
+    }
+
+    /** 探测本应用能否拿到 root——决定「root 注入」这个开关走不走得通 */
     private void checkRootAvailability() {
-        tvRootHint.setText("正在检测 root 注入可用性…");
+        tvRootHint.setText(R.string.root_checking);
+        tvRootHint.setTextColor(0xFF666666);
         new Thread(() -> {
-            String result;
+            String error = null;
+            boolean ok = false;
             try {
-                Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "id -u"});
-                StringBuilder sb = new StringBuilder();
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-                    String line;
-                    while ((line = r.readLine()) != null) {
-                        sb.append(line.trim());
-                    }
-                }
-                boolean finished = p.waitFor(8, TimeUnit.SECONDS);
-                boolean ok = finished && p.exitValue() == 0 && "0".equals(sb.toString().trim());
-                result = ok
-                        ? "root 注入可用：无需把目标 App 勾进作用域，验证码会以按键方式填入当前焦点输入框"
-                                + "（需先点进输入框，对自绘控件同样有效）。装完请打开过本应用一次，"
-                                + "否则收不到触发广播。"
-                        : "拿不到 root：请在 KernelSU 管理器里给本应用授予 root 权限；"
-                                + "未授权时只能靠「把目标 App 勾进作用域 + setText」填入。";
+                ok = probeRoot();
             } catch (Throwable t) {
-                result = "root 检测异常：" + t;
+                error = String.valueOf(t.getMessage());
             }
-            final String hint = result;
-            runOnUiThread(() -> tvRootHint.setText(hint));
+            final boolean okFinal = ok;
+            final String errFinal = error;
+            runOnUiThread(() -> {
+                if (errFinal != null) {
+                    tvRootHint.setText(getString(R.string.root_probe_error, errFinal));
+                    tvRootHint.setTextColor(0xFFD32F2F);
+                } else if (okFinal) {
+                    tvRootHint.setText(R.string.root_ok);
+                    tvRootHint.setTextColor(0xFF2E7D32);
+                } else {
+                    tvRootHint.setText(R.string.root_missing);
+                    tvRootHint.setTextColor(0xFFD32F2F);
+                }
+            });
         }, "root-probe").start();
+    }
+
+    /** @return 本应用能否以 root 身份执行 shell 命令 */
+    private static boolean probeRoot() throws Exception {
+        Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "id -u"});
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                sb.append(line.trim());
+            }
+        }
+        boolean finished = p.waitFor(8, TimeUnit.SECONDS);
+        return finished && p.exitValue() == 0 && "0".equals(sb.toString().trim());
     }
 
     @Override

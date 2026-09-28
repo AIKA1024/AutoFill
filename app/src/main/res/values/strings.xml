@@ -2,4 +2,8 @@
 <resources>
     <string name="app_name">验证码自动填充</string>
     <string name="app_desc">收到短信时自动复制并填入验证码（支持自定义正则 / 拦截）</string>
+    <string name="root_checking">正在检测 root 授权…</string>
+    <string name="root_ok">✓ 已获得 root：无需把目标 App 勾进作用域，验证码会以按键方式填入当前焦点输入框（先点进输入框，对自绘控件同样有效）。装完建议先打开本应用一次。</string>
+    <string name="root_missing">✗ 未获得 root 权限：请在 root 管理器（KernelSU / Magisk / APatch）里给本应用授予 root，否则上面这个开关不生效，只能靠「把目标 App 勾进作用域 + setText」填入。授权后回到本页会自动重新检测。</string>
+    <string name="root_probe_error">✗ root 检测失败：%1$s</string>
 </resources>

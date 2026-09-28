@@ -136,7 +136,9 @@ getInvoker / getRemotePreferences / 远程文件），所以模块无法自行�
 
 前提与限制：
 
-1. 在 root 管理器（KernelSU / Magisk）里给本应用**授予 root 权限**；
+1. 在 root 管理器（KernelSU / Magisk / APatch）里给本应用**授予 root 权限**；
+   设置页底部会实时显示授权状态（绿色「已获得 root」/ 红色「未获得 root」），
+   去授权后返回设置页会自动重新检测；
 2. **装完 / 升级后必须手动打开一次本应用**（一次性，之后永久有效，重启也不会退回）。
    原因：Android 3.1 起，从未启动过（或被 force-stop）的应用处于 stopped 状态，
    **收不到任何广播**——包括显式 `setPackage` 广播、加

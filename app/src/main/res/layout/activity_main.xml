@@ -101,7 +101,7 @@
             android:layout_height="wrap_content"
             android:paddingTop="12dp"
             android:paddingBottom="12dp"
-            android:text="无人接管时用 root 注入（input text）"
+            android:text="无人接管时用 root 注入（需 root 权限）"
             android:textSize="16sp" />
 
         <TextView
@@ -109,7 +109,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingBottom="8dp"
-            android:text="检测中…"
+            android:text="@string/root_checking"
             android:textColor="#FF666666"
             android:textSize="12sp" />
 
@@ -222,7 +222,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:lineSpacingExtra="4dp"
-            android:text="使用说明：\n1. 在 LSPosed 中启用本模块，作用域勾选「系统框架」与「电话/Phone」，然后重启或软重启。\n2. 修改配置后需要重新打开一次本应用，或等待通知配置刷新；大部分情况下立即可用。\n3. 短信在 com.android.phone 进程解析，复制/Toast/通知/填入在前台 App 进程执行；若当时没有前台 App，则由电话进程兜底复制并通知。\n4. Android 13+ 上通知由前台 App 自己发出，若该 App 未授予通知权限，会自动改由电话进程代发。\n5. 拦截会在短信分发前丢弃该短信，请谨慎开启。"
+            android:text="使用说明：\n1. 在 LSPosed 中启用本模块，作用域勾选「电话服务（com.android.phone）」；用 root 注入时不必把目标 App 勾进作用域。然后重启（软重启不够）。\n2. 修改配置后需要重新打开一次本应用，或等待通知配置刷新；大部分情况下立即可用。\n3. 短信在 com.android.phone 进程解析，复制/Toast/通知/填入在前台 App 进程执行；若当时没有前台 App，则由电话进程兜底复制并通知。\n4. Android 13+ 上通知由前台 App 自己发出，若该 App 未授予通知权限，会自动改由电话进程代发。\n5. 拦截会在短信分发前丢弃该短信，请谨慎开启。\n6. root 注入需要本应用拿到 root 权限：请在 root 管理器（KernelSU / Magisk / APatch）里授权，未授权时该开关不生效。"
             android:textColor="#FF666666"
             android:textSize="12sp" />
 
